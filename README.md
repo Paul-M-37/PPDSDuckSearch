@@ -35,7 +35,7 @@ Instructions:
 ### [Known Issues!]
 * None
 ## Installation
-To install these mods, you will need to install [MelonLoader](https://discord.gg/2Wn3N2P) (discord link, see \#how-to-install).
+To install these mods, you will need to install [MelonLoader](https://melonwiki.xyz/#/?id=automated-installation)
 Then, you will have to put mod .dll files from [releases](https://github.com/Paul-M-37/PPDSDuckSearch/releases) into the `Mods` folder of your game directory
 
 ## Building
