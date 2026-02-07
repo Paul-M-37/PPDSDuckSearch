@@ -10,6 +10,7 @@ using UnityEngine.EventSystems;
 
 
 
+
 [assembly: MelonInfo(typeof(CustomSearch), "CustomSearch", "0.1.1", "PaulM37", "")]
 [assembly: MelonGame("Turbolento Games", "Placid Plastic Duck Simulator")]
 
@@ -18,6 +19,7 @@ namespace Custom_Search
 {
     public class CustomSearch : MelonMod
     {
+
         internal static CustomSearch _instance { get; set; }
         private static GeneralManager _generalManager;
         private static DuckUIManager _DuckUIManager;
@@ -27,7 +29,13 @@ namespace Custom_Search
         public static Dictionary<string, string> _duckNames { get; set; } = new Dictionary<string, string>();
         public static Dictionary<string, string> _duckRevertNames { get; set; } = new Dictionary<string, string>();
         public static Dictionary<string, int> _ducks { get; set; } = new Dictionary<string, int>();
-        public static Dictionary<string, bool> _excludedScene { get; set; }
+              public static Dictionary<string, bool> _excludedScene { get; set; } = new Dictionary<string, bool>()
+             {
+
+                {"Intro",false},
+                {"Loading",false},
+                {"Bootstrap",false}
+            };
         public static DuckManager currentduck { get; set; }
 
         public static Dictionary<String, GameObject> _waitingDucks { get; set; }
@@ -43,15 +51,6 @@ namespace Custom_Search
         {
             CustomSearchSettings.RegisterSettings();
             _DuckSearch = CustomSearchSettings.DuckSearch.Value;
-            // set scene to exclude to process
-            _excludedScene = new Dictionary<string, bool>()
-             {
-
-                {"Intro",false},
-                {"Loading",false},
-                {"Bootstrap",false}
-            };
-
         }
         public static bool isActive()
         {
@@ -88,6 +87,28 @@ namespace Custom_Search
                     CustomSearch.Msg("Menu Manager Didn't Hook!!",true);
                 }
             }
+            // get Duck List
+            GetDuckList();
+
+            // add alien on hyppospace
+            if ( _sceneName == "hyppospace" )
+            {                
+                if( _ducks.ContainsKey("Duck46Alien"))
+                {
+                    _ducks["Duck46Alien"] = 0;
+                }
+                else
+                {
+                    _ducks.Add("Duck46Alien", 0);    
+                }
+                
+            }
+         }
+        public static void GetDuckList()
+        // public static Dictionary<string, Dictionary<string, string>>? GetDuckList( )
+        {
+            if (!CustomSearch.isActive()) { return ; }
+
             //Hook General Manager
             _generalManager = Singleton<GeneralManager>.I;
             if (_generalManager == null)
@@ -126,27 +147,54 @@ namespace Custom_Search
             }
 
         }
-        public override void OnLateUpdate()
+
+        public static int UpdateDuckList(string duckId, GameObject? newDuck)
+        {
+            if (!CustomSearch.isActive()) { return 0; }
+
+        
+
+            // update duck list with new spawned duck
+            int duckIndex = -1;
+            if (newDuck != null)
+            {
+                if (_generalManager != null) { duckIndex = _generalManager.GetDuckIndex(newDuck); }
+            }
+            if (_ducks.ContainsKey(duckId))
+            {
+
+                _ducks[duckId] = duckIndex;
+            }
+            else
+            {
+                _ducks.Add(duckId, duckIndex);
+            }
+        
+            return duckIndex;
+        }
+        static public void AddWaitingDucks()
         {
             if (!CustomSearch.isActive()) { return; }
+            if (_waitingDucks == null) { return; }
 
             // manage ducks loaded during Loadin screen (no spawn)
             if (_waitingDucks != null && _generalManager != null && _ducks != null)
             {
                 foreach (var duck in _waitingDucks)
                 {
-                    var duckIndex = CustomSearch.updateDuckList(duck.Key, duck.Value);
+                    var duckIndex = UpdateDuckList(duck.Key, duck.Value);
                     if (duckIndex >= 0) { _waitingDucks.Remove(duck.Key); }
                 }
             }
 
-        }
+        }        
         public static void DrawMenu()
         {
             if (!CustomSearch.isActive()) { return; }
 
             // Mod Screen
             GUILayout.BeginArea(new Rect(Screen.width / 24, Screen.height / 24, Screen.width / 24 + Screen.width / 6, Screen.height / 24 + Screen.height / 6));
+
             // Title
             GUILayout.Label(CustomSearchSettings.ModTitle.Value);
             // input box wih label
@@ -163,10 +211,12 @@ namespace Custom_Search
                     CustomSearch.ResumeGame();
                 }
             }
+            
             GUILayout.EndArea();
         }
         public static void ResumeGame()
         {
+            if (!CustomSearch.isActive()) { return; }
             if (_ResumeButton == null) { return; }
             MelonEvents.OnGUI.Unsubscribe(DrawMenu);
 
@@ -177,59 +227,87 @@ namespace Custom_Search
         }
         public static string InputPrompt()
         {
+            if (!CustomSearch.isActive()) { return ""; }
             CustomSearch.SearchDuckName = "";
             MelonEvents.OnGUI.Subscribe(DrawMenu, 100); // The higher the value, the lower the priority.
             return CustomSearch.SearchDuckName;
         }
 
 
-        public static void DuckSearch(string duckName = null) //Void can be used for other mods
+        public static string DuckSearch(string? duckName = null, string? duckId = null, bool AllowPrompt = true) //Void can be used for other mods
         {
-            DuckManager currentduck = null;
-            String MyMessage = null;
-            if (duckName == null || duckName == "")
-            {
+            if (!CustomSearch.isActive()) { return ""; }
+            
+           DuckManager? currentduck = null;
+            String? MyMessage = null;
 
-                duckName = InputPrompt();
-                return;
+            // id to search , default parameter id
+            String? SearchedDuckId = duckId;
+            String? SearchedName = duckName;
+
+            // No general mager Exit
+            if (_generalManager == null) { return ""; }
+
+            // if no Duck Id nor Duck Name , prompt if prompt is active 
+            if (SearchedDuckId == null && (SearchedName == null || SearchedName == ""))
+            {
+                if (AllowPrompt) { SearchedName = InputPrompt(); }
+                return "";
             }
-
-            if (_duckNames.ContainsKey(duckName))
+          
+            // define Duck id to search if not provided.
+            if (SearchedDuckId == null && SearchedName != null && _duckNames.ContainsKey(SearchedName))
             {
-                if (_ducks.ContainsKey(_duckNames[duckName]))
-                {
-                    var duckIndex = _ducks[_duckNames[duckName]];
-                    if (duckIndex < 0) { }
-                    else
-                    {
-                        currentduck = _generalManager.GetDuck(duckIndex);
-                    }
-                }
-                if (currentduck == null)
-                {
-                    MyMessage = String.Format(CustomSearchSettings.MsgDuckNotHere.Value, duckName);
-                }
+                SearchedDuckId = _duckNames[SearchedName];
+            }
+            else if (SearchedDuckId == null)
+            {
+                MyMessage = String.Format(CustomSearchSettings.MsgDuckNotFound.Value, SearchedName);
+            }
+            
+
+            // get index of Duck in the scene
+            if (SearchedDuckId != null && _ducks.ContainsKey(SearchedDuckId))
+            {
+                var duckIndex = _ducks[SearchedDuckId];
+                if (duckIndex < 0) { }
                 else
                 {
-                    _generalManager.ChangeCurrentDuck(currentduck);
-
-                    MyMessage = String.Format(CustomSearchSettings.MsgDuckFound.Value, duckName);
+                    currentduck = _generalManager.GetDuck(duckIndex);
                 }
+            }
+
+            // if Duck Id and not found in scene
+            if (SearchedDuckId != null && currentduck == null)
+            {
+                MyMessage = String.Format(CustomSearchSettings.MsgDuckNotHere.Value, SearchedName);
             }
             else
             {
-                MyMessage = String.Format(CustomSearchSettings.MsgDuckNotFound.Value, duckName);
+                // show duck                
+                _generalManager.SwitchToDucksView();
+                _generalManager.SwitchOnDucks();
+                _generalManager.ChangeCurrentDuck(currentduck);
+                _generalManager.ResetSwitchCounter();
+                MyMessage = String.Format(CustomSearchSettings.MsgDuckFound.Value, SearchedName);
             }
 
+
+            // Send message to screen
             if (MyMessage != null)
             {
-                CustomSearch.Msg(MyMessage);
-                CustomSearch._generalManager.MsgManager.PushMsg(MyMessage);
+                _generalManager.MsgManager.PushMsg(MyMessage);
             }
+            else
+            {
+                MyMessage = "";
+            }
+             return MyMessage; 
 
         }
         public static void AddWaitingDuck(string duckId, GameObject newDuck)
         {
+            if (!CustomSearch.isActive()) { return ; }
             // add duck loaded during Loading screen to waiting list
             if (_waitingDucks == null)
             {
@@ -241,8 +319,10 @@ namespace Custom_Search
                 _waitingDucks[duckId] = newDuck;
             }
         }
-        public static int updateDuckList(string duckId, GameObject newDuck)
+        public static int updateDuckList(string duckId, GameObject? newDuck)
         {
+            if (!CustomSearch.isActive()) { return 0; }
+
             // update duck list with new spawned duck
             int duckIndex = -1;
             if (newDuck != null)
@@ -269,7 +349,11 @@ namespace Custom_Search
             if (_duckRevertNames != null && _duckRevertNames.ContainsKey(duckID))
             {
                 var oldname = _duckRevertNames[duckID];
-                if(oldname != "" && oldname != null && _duckNames != null && _duckNames.ContainsKey(oldname)) { _duckNames.Remove(oldname); }
+                if (oldname != "" && oldname != null && _duckNames != null && _duckNames.ContainsKey(oldname)
+                && oldname != LowerDuckName)
+                {
+                    _duckNames.Remove(oldname);                 
+                }
                 _duckRevertNames[duckID] = LowerDuckName;
             }
             else
@@ -288,7 +372,7 @@ namespace Custom_Search
             {
                 if (_duckNames != null && _duckNames.ContainsKey(LowerDuckName))
                 {
-                    hasduplicate = true;
+                    if( _duckNames[LowerDuckName] != duckID ) { hasduplicate = true; }
                     _duckNames[LowerDuckName] = duckID;
 
                 }
@@ -313,33 +397,37 @@ namespace Custom_Search
             static void Postfix(ref GeneralManager __instance, GameObject newDuck, string duckId, bool saveSpawn, string fixedName, int playerID)
             {
                 if (!CustomSearch.isActive()) { return; }
-                if (CustomSearch._excludedScene.ContainsKey(_sceneName)) { CustomSearch.AddWaitingDuck(duckId, newDuck); return; }
-
+                if (_sceneName == null || CustomSearch._excludedScene.ContainsKey(_sceneName)) { CustomSearch.AddWaitingDuck(duckId, newDuck); return; }
+                CustomSearch.AddWaitingDucks();
                 CustomSearch.updateDuckList(duckId, newDuck);
             }
 
         }
-        [HarmonyPatch(typeof(DuckManager), "LateUpdate")]
-        public class DuckManager_LateUpdate
+        [HarmonyPatch(typeof(DuckManager), "NameChanged")]
+        public class DuckManager_NameChanged
         {
-            static void Postfix(ref DuckManager __instance)
+            static void Postfix(ref DuckManager __instance, string duckID, string newName, bool sendChangeToPeers)
             {
                 if (!CustomSearch.isActive()) { return; }
+                
+                // At name change
                 DuckManager Duck = __instance;
-
+    
                 // update duck name list
-                if (CustomSearch.UpdateDuckNameList(Duck.duckID, Duck.DisplayName))
+                if (UpdateDuckNameList(duckID, newName))
                 {
-                    var MyMessage = String.Format(CustomSearchSettings.MsgDuckDuplicate.Value, Duck.DisplayName);
-                    CustomSearch._instance.LoggerInstance.Msg(MyMessage);
-                    if (CustomSearch._generalManager != null && CustomSearch._generalManager.MsgManager != null)
+                    var MyMessage = String.Format(CustomSearchSettings.MsgDuckDuplicate.Value, newName);
+                    CustomSearch.Msg( MyMessage );
+                    if (_generalManager != null && _generalManager.MsgManager != null)
                     {
-                        CustomSearch._generalManager.MsgManager.PushMsg(MyMessage);
+                        _generalManager.MsgManager.PushMsg(MyMessage);
                     }
                 }
+                
             }
 
-        }
+        }        
+
         [HarmonyPatch(typeof(MenuManager), "ShowMenuScreen")]
         public class MenuManager_ShowMenuScreen
         {
@@ -360,6 +448,7 @@ namespace Custom_Search
             static void Postfix(ref MenuButton __instance)
             {
 
+                if (!CustomSearch.isActive()) { return; }
                 if (__instance.Button.name == "RESUME_Button")
                 {
                     if (__instance._baseScreen != null && __instance._baseScreen.name == "PauseMenu")
