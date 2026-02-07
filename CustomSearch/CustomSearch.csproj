@@ -6,7 +6,7 @@
         <AppDesignerFolder>Properties</AppDesignerFolder>
         <RootNamespace>Custom_Search</RootNamespace>
         <AssemblyName>CustomSearch</AssemblyName>
-        <AssemblyVersion>0.1.1.0</AssemblyVersion>
+        <AssemblyVersion>0.1.2.0</AssemblyVersion>
         <TargetFramework>net6</TargetFramework>
         <Deterministic>true</Deterministic>
         <FileAlignment>512</FileAlignment>
